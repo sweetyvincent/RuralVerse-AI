@@ -74,22 +74,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(response.user);
       return response.user;
     } catch (err: any) {
-      // If deployed on static host (e.g. GitHub Pages) and backend is not connected
-      if (!err.response || err.response.status === 404 || err.code === 'ERR_NETWORK') {
+      // If backend is unreachable (offline, GitHub Pages static hosting, or Vite proxy 500/502/504)
+      const isOfflineOrStatic =
+        !err.response ||
+        [404, 500, 502, 503, 504].includes(err.response?.status) ||
+        err.code === 'ERR_NETWORK';
+
+      if (isOfflineOrStatic) {
         let fallbackRole: 'admin' | 'teacher' | 'student' = 'student';
         let fallbackName = 'Arun Kumar';
 
-        if (email.includes('admin')) {
+        const emailLower = (email || '').toLowerCase();
+        if (emailLower.includes('admin')) {
           fallbackRole = 'admin';
           fallbackName = 'Platform Administrator';
-        } else if (email.includes('teacher') || email.includes('curriculum')) {
+        } else if (emailLower.includes('teacher') || emailLower.includes('curriculum')) {
           fallbackRole = 'teacher';
           fallbackName = 'Dr. Meenakshi Sundaram';
         }
 
         const fallbackUser: User = {
           id: 1,
-          email,
+          email: email || 'student@ruralverse.org',
           full_name: fallbackName,
           role: fallbackRole,
           preferred_language: 'ta',

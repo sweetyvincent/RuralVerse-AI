@@ -7,8 +7,8 @@ import { Input } from '../../components/ui/input';
 import { Card } from '../../components/ui/card';
 
 export const AdminLogin: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@ruralverse.org');
+  const [password, setPassword] = useState('AdminPassword2026!');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
