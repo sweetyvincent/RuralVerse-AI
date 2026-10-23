@@ -36,14 +36,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       return;
     }
+    // If it's a static demo token, preserve saved user
+    if (token === 'demo_jwt_token_for_static_preview') {
+      const saved = localStorage.getItem('ruralverse_user');
+      if (saved) setUser(JSON.parse(saved));
+      setIsLoading(false);
+      return;
+    }
     try {
       const profile = await authService.getProfile();
       setUser(profile);
       localStorage.setItem('ruralverse_user', JSON.stringify(profile));
-    } catch (err) {
-      localStorage.removeItem('ruralverse_token');
-      localStorage.removeItem('ruralverse_user');
-      setUser(null);
+    } catch (err: any) {
+      // In case backend is temporarily unreachable on static demo
+      const saved = localStorage.getItem('ruralverse_user');
+      if (saved && (!err.response || err.response.status === 404)) {
+        setUser(JSON.parse(saved));
+      } else {
+        localStorage.removeItem('ruralverse_token');
+        localStorage.removeItem('ruralverse_user');
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -54,11 +67,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
-    const response = await authService.login({ email, password });
-    localStorage.setItem('ruralverse_token', response.access_token);
-    localStorage.setItem('ruralverse_user', JSON.stringify(response.user));
-    setUser(response.user);
-    return response.user;
+    try {
+      const response = await authService.login({ email, password });
+      localStorage.setItem('ruralverse_token', response.access_token);
+      localStorage.setItem('ruralverse_user', JSON.stringify(response.user));
+      setUser(response.user);
+      return response.user;
+    } catch (err: any) {
+      // If deployed on static host (e.g. GitHub Pages) and backend is not connected
+      if (!err.response || err.response.status === 404 || err.code === 'ERR_NETWORK') {
+        let fallbackRole: 'admin' | 'teacher' | 'student' = 'student';
+        let fallbackName = 'Arun Kumar';
+
+        if (email.includes('admin')) {
+          fallbackRole = 'admin';
+          fallbackName = 'Platform Administrator';
+        } else if (email.includes('teacher') || email.includes('curriculum')) {
+          fallbackRole = 'teacher';
+          fallbackName = 'Dr. Meenakshi Sundaram';
+        }
+
+        const fallbackUser: User = {
+          id: 1,
+          email,
+          full_name: fallbackName,
+          role: fallbackRole,
+          preferred_language: 'ta',
+          grade: fallbackRole === 'student' ? '8th Grade' : undefined,
+          is_active: true,
+        };
+        localStorage.setItem('ruralverse_token', 'demo_jwt_token_for_static_preview');
+        localStorage.setItem('ruralverse_user', JSON.stringify(fallbackUser));
+        setUser(fallbackUser);
+        return fallbackUser;
+      }
+      throw err;
+    }
   };
 
   const register = async (data: {
