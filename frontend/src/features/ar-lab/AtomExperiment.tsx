@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Play, Pause, RotateCcw, CheckCircle2, Sparkles, Atom, Info } from 'lucide-react';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Play, Pause, RotateCcw, CheckCircle2, Sparkles, Atom, Info, Compass } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -108,6 +109,12 @@ export const AtomExperiment: React.FC = () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     currentMount.appendChild(renderer.domElement);
 
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 8;
+    controls.maxDistance = 50;
+
     // Ambient and point light
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
@@ -132,6 +139,7 @@ export const AtomExperiment: React.FC = () => {
     let angle = 0;
     const animate = () => {
       animationFrameId.current = requestAnimationFrame(animate);
+      controls.update();
 
       if (isPlaying) {
         angle += 0.015 * orbitSpeed;
@@ -173,6 +181,7 @@ export const AtomExperiment: React.FC = () => {
     return () => {
       window.removeEventListener('resize', handleResize);
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      controls.dispose();
       renderer.dispose();
       if (currentMount.contains(renderer.domElement)) {
         currentMount.removeChild(renderer.domElement);

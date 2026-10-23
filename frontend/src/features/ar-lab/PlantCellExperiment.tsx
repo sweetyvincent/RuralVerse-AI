@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Play, Pause, RotateCcw, Sun, Sparkles, Sprout, Info, Shield, Droplets } from 'lucide-react';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Play, Pause, RotateCcw, Sun, Sparkles, Sprout, Info, Shield, Droplets, Compass } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -80,6 +81,12 @@ export const PlantCellExperiment: React.FC = () => {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     currentMount.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 6;
+    controls.maxDistance = 40;
 
     // Ambient and Directional Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -215,6 +222,7 @@ export const PlantCellExperiment: React.FC = () => {
     // Animation Loop
     const animate = () => {
       animationFrameId.current = requestAnimationFrame(animate);
+      controls.update();
 
       if (isRotating && cellGroupRef.current) {
         cellGroupRef.current.rotation.y += 0.003;
@@ -252,6 +260,7 @@ export const PlantCellExperiment: React.FC = () => {
     return () => {
       window.removeEventListener('resize', handleResize);
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      controls.dispose();
       renderer.dispose();
       if (currentMount.contains(renderer.domElement)) {
         currentMount.removeChild(renderer.domElement);

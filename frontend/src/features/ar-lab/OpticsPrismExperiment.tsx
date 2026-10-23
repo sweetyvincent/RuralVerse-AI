@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Play, RotateCcw, Lightbulb, Sparkles, Sun, Eye, Info } from 'lucide-react';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Play, RotateCcw, Lightbulb, Sparkles, Sun, Eye, Info, Compass } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -59,6 +60,12 @@ export const OpticsPrismExperiment: React.FC = () => {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     currentMount.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 8;
+    controls.maxDistance = 45;
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -141,6 +148,7 @@ export const OpticsPrismExperiment: React.FC = () => {
     // Render loop
     const animate = () => {
       animationFrameId.current = requestAnimationFrame(animate);
+      controls.update();
       renderer.render(scene, camera);
     };
     animate();
@@ -159,6 +167,7 @@ export const OpticsPrismExperiment: React.FC = () => {
     return () => {
       window.removeEventListener('resize', handleResize);
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      controls.dispose();
       renderer.dispose();
       if (currentMount.contains(renderer.domElement)) {
         currentMount.removeChild(renderer.domElement);
