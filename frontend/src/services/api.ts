@@ -23,12 +23,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login') && !currentPath.includes('/register') && currentPath !== '/') {
+    const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+    if (!isGitHubPages && error.response?.status === 401) {
+      const currentHash = window.location.hash;
+      if (!currentHash.includes('/login') && !currentHash.includes('/register')) {
         localStorage.removeItem('ruralverse_token');
         localStorage.removeItem('ruralverse_user');
-        window.location.href = '/student/login';
+        window.location.hash = '#/student/login';
       }
     }
     return Promise.reject(error);

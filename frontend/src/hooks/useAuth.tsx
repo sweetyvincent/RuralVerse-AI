@@ -48,9 +48,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(profile);
       localStorage.setItem('ruralverse_user', JSON.stringify(profile));
     } catch (err: any) {
-      // In case backend is temporarily unreachable on static demo
+      // In case backend is temporarily unreachable on static demo / GitHub Pages
       const saved = localStorage.getItem('ruralverse_user');
-      if (saved && (!err.response || err.response.status === 404)) {
+      const isStaticOrUnreachable =
+        !err.response ||
+        [404, 405, 500, 502, 503, 504].includes(err.response?.status) ||
+        window.location.hostname.includes('github.io');
+
+      if (saved && isStaticOrUnreachable) {
         setUser(JSON.parse(saved));
       } else {
         localStorage.removeItem('ruralverse_token');
@@ -67,6 +72,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
+    // If running on GitHub Pages (static hosting with no live backend server attached)
+    const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+
+    if (isGitHubPages) {
+      let fallbackRole: 'admin' | 'teacher' | 'student' = 'student';
+      let fallbackName = 'Arun Kumar';
+
+      const emailLower = (email || '').toLowerCase();
+      if (emailLower.includes('admin')) {
+        fallbackRole = 'admin';
+        fallbackName = 'Platform Administrator';
+      } else if (emailLower.includes('teacher') || emailLower.includes('curriculum')) {
+        fallbackRole = 'teacher';
+        fallbackName = 'Dr. Meenakshi Sundaram';
+      }
+
+      const fallbackUser: User = {
+        id: fallbackRole === 'admin' ? 2 : fallbackRole === 'teacher' ? 3 : 4,
+        email: email || `${fallbackRole}@ruralverse.org`,
+        full_name: fallbackName,
+        role: fallbackRole,
+        preferred_language: 'ta',
+        grade: fallbackRole === 'student' ? '8th Grade' : undefined,
+        is_active: true,
+      };
+      localStorage.setItem('ruralverse_token', 'demo_jwt_token_for_static_preview');
+      localStorage.setItem('ruralverse_user', JSON.stringify(fallbackUser));
+      setUser(fallbackUser);
+      return fallbackUser;
+    }
+
     try {
       const response = await authService.login({ email, password });
       localStorage.setItem('ruralverse_token', response.access_token);
@@ -74,11 +110,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(response.user);
       return response.user;
     } catch (err: any) {
-      // If backend is unreachable (offline, GitHub Pages static hosting, or Vite proxy 500/502/504)
+      // If backend is unreachable (offline, GitHub Pages static hosting, 405 Not Allowed, or Vite proxy 500/502/504)
       const isOfflineOrStatic =
         !err.response ||
-        [404, 500, 502, 503, 504].includes(err.response?.status) ||
-        err.code === 'ERR_NETWORK';
+        [404, 405, 500, 502, 503, 504].includes(err.response?.status) ||
+        err.code === 'ERR_NETWORK' ||
+        window.location.hostname.includes('github.io');
 
       if (isOfflineOrStatic) {
         let fallbackRole: 'admin' | 'teacher' | 'student' = 'student';
@@ -94,8 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const fallbackUser: User = {
-          id: 1,
-          email: email || 'student@ruralverse.org',
+          id: fallbackRole === 'admin' ? 2 : fallbackRole === 'teacher' ? 3 : 4,
+          email: email || `${fallbackRole}@ruralverse.org`,
           full_name: fallbackName,
           role: fallbackRole,
           preferred_language: 'ta',
