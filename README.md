@@ -3,6 +3,9 @@
 > **Intelligent • Multilingual • Immersive**  
 > An accessible AI-powered educational web application built for rural students featuring **Air-Writing with webcam hand tracking**, an **Interactive 3D AR Science Lab**, **Multilingual AI Tutoring with RAG citations**, and **Offline-First learning support**.
 
+🔗 **Live Deployment:** [https://sweetyvincent.github.io/RuralVerse-AI/](https://sweetyvincent.github.io/RuralVerse-AI/)  
+📁 **GitHub Repository:** [https://github.com/sweetyvincent/RuralVerse-AI](https://github.com/sweetyvincent/RuralVerse-AI)
+
 ---
 
 ## 🌟 Key Features
