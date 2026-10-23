@@ -26,8 +26,12 @@ export const TeacherLayout: React.FC = () => {
   ];
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/teacher/login');
+    try {
+      await logout();
+    } catch (err) {
+      console.warn('Teacher logout error:', err);
+    }
+    navigate('/teacher/login', { replace: true });
   };
 
   return (

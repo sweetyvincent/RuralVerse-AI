@@ -161,8 +161,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.warn('Auth context logout error caught:', err);
+    } finally {
+      localStorage.removeItem('ruralverse_token');
+      localStorage.removeItem('ruralverse_user');
+      setUser(null);
+    }
   };
 
   return (

@@ -51,8 +51,12 @@ export const StudentLayout: React.FC = () => {
   ];
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/student/login');
+    try {
+      await logout();
+    } catch (err) {
+      console.warn('Logout handler caught error:', err);
+    }
+    navigate('/student/login', { replace: true });
   };
 
   return (
