@@ -26,12 +26,19 @@ interface Message {
   timestamp: string;
 }
 
-export const ChatInterface: React.FC = () => {
+interface ChatInterfaceProps {
+  initialContext?: string;
+}
+
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialContext }) => {
+  const [activeContext, setActiveContext] = useState<string | undefined>(initialContext);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       sender: 'ai',
-      text: 'Vanakkam! Namaste! Hello! I am your RuralVerse Multilingual AI Tutor. Ask me any question about your lessons, science experiments, or math concepts in your preferred language.',
+      text: initialContext
+        ? `Vanakkam! Namaste! Hello! I have loaded your uploaded lesson into our study session. Ask me any question about it in English, Tamil, Hindi, or Telugu!`
+        : 'Vanakkam! Namaste! Hello! I am your RuralVerse Multilingual AI Tutor. Ask me any question about your lessons, science experiments, or math concepts in your preferred language.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -107,7 +114,7 @@ export const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = await aiService.chat(userText, language);
+      const result = await aiService.chat(userText, language, activeContext);
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
@@ -162,6 +169,11 @@ export const ChatInterface: React.FC = () => {
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 RuralVerse Multilingual Tutor
                 <Badge variant="cyan">Gemini RAG</Badge>
+                {activeContext && (
+                  <Badge variant="emerald" className="text-[10px]">
+                    Lesson Grounded
+                  </Badge>
+                )}
               </h3>
               <p className="text-[11px] text-slate-400">Ground truth answers backed by indexed local textbooks</p>
             </div>

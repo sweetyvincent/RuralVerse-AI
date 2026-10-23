@@ -99,6 +99,62 @@ def upload_knowledge_document(
     return doc
 
 
+@router.post("/student/upload-lesson")
+def upload_student_lesson_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_role(["student", "teacher", "admin"])),
+):
+    """
+    Accepts student-uploaded lesson documents (PDF, TXT, MD) and extracts clean text
+    for note synthesis and question generation.
+    """
+    filename = file.filename or "Uploaded_Lesson.txt"
+    ext = os.path.splitext(filename)[1].lower()
+
+    content_text = ""
+    try:
+        file_bytes = file.file.read()
+        if ext == ".pdf":
+            import io
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            text_pages = [page.extract_text() for page in reader.pages if page.extract_text()]
+            content_text = "\n\n".join(text_pages)
+        else:
+            content_text = file_bytes.decode("utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {str(e)}")
+
+    if not content_text.strip():
+        raise HTTPException(status_code=400, detail="Could not extract readable text from the uploaded document.")
+
+    title = os.path.splitext(filename)[0].replace("_", " ").replace("-", " ")
+    return {
+        "title": title,
+        "filename": filename,
+        "content": content_text,
+        "char_count": len(content_text),
+    }
+
+
+@router.post("/student/analyze-lesson")
+def analyze_student_lesson(
+    payload: dict,
+    current_user: User = Depends(require_role(["student", "teacher", "admin"])),
+):
+    """
+    Analyzes student lesson text and generates structured Key Notes and Assessment Questions.
+    """
+    title = payload.get("title", "Student Lesson")
+    content = payload.get("content", "")
+    language = payload.get("language", "en")
+
+    if not content.strip():
+        raise HTTPException(status_code=400, detail="Lesson content is required.")
+
+    return ai_service.analyze_lesson_content(title=title, content=content, language=language)
+
+
 @router.post("/knowledge-base/documents/{document_id}/index")
 def trigger_document_indexing(
     document_id: int,
