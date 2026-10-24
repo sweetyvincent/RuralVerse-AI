@@ -213,8 +213,9 @@ def analyze_lesson_content(
     language: str = "en",
 ) -> Dict[str, Any]:
     """
-    Analyzes an uploaded student lesson and generates comprehensive Key Revision Notes
-    and assessment questions (MCQs & Short Answer) based strictly on the lesson text.
+    Analyzes an uploaded student lesson/PDF and generates exhaustive Key Revision Notes
+    strictly formatted in structured bullet points (covering all important content from the text),
+    along with assessment questions (MCQs & Short Answer).
     """
     clean_title = title.strip() or "Uploaded Student Lesson"
     clean_text = content.strip()
@@ -226,32 +227,51 @@ def analyze_lesson_content(
 
     if api_key:
         prompt = f"""
-You are an expert rural education tutor and curriculum analyst. A student has uploaded their own lesson notes.
-Carefully analyze the lesson text and generate:
-1. An Executive Summary (clear, easy to understand).
-2. Key Concepts & Definitions.
-3. Important Formulas, Laws, or Principles.
-4. Key Takeaways (5 bullet points for quick exam revision).
-5. 4 Multiple-Choice Questions (MCQs) with 4 options, the exact correct answer, and an explanation.
-6. 2 Conceptual Short-Answer Questions with ideal model answers.
+You are an expert curriculum developer and academic tutor. A student has uploaded a lesson document/PDF.
+You must extract and synthesize ALL IMPORTANT CONTENT from the entire document into structured, high-yield KEY POINTS.
+
+CRITICAL INSTRUCTIONS:
+- Format ALL notes strictly in BULLET POINTS / KEY POINTS. Do NOT write long paragraphs of prose.
+- Cover ALL key topics, subtopics, scientific principles, facts, data, mechanisms, and examples present in the text so nothing important is missed.
+- Organize the output clearly into:
+  1. "summary_points": 4-6 high-yield summary bullet points outlining the core thesis of the lesson.
+  2. "comprehensive_key_points": Section-by-section breakdown of the entire document into categorized key points (e.g. "Fundamental Principles", "Structure & Anatomy", "Working Mechanism & Reactions", "Applications & Observations", "Important Rules & Constants"). Each category must have 4-8 comprehensive bullet points.
+  3. "key_concepts": All crucial terms, nomenclature, and definitions defined as concise bullet points.
+  4. "formulas_and_rules": All equations, formulas, mathematical relationships, chemical reactions, or physical laws in bullet points with parameter explanations.
+  5. "bullet_takeaways": 6-8 rapid-fire exam recall points.
+  6. "mcq_questions": 4-5 multiple choice questions with options and explanations.
+  7. "short_answer_questions": 2-3 conceptual questions with model answers.
 
 Lesson Title: "{clean_title}"
 Language requested: "{language}"
 Lesson Content:
-{clean_text[:6000]}
+{clean_text[:7500]}
 
 Return valid JSON strictly matching this schema:
 {{
   "title": "{clean_title}",
-  "summary": "Clear executive summary of the lesson...",
+  "summary_points": [
+    "Key point 1 summarizing the core concept...",
+    "Key point 2 summarizing the mechanism..."
+  ],
+  "comprehensive_key_points": [
+    {{
+      "category": "Topic / Section Name",
+      "points": [
+        "Exhaustive, high-yield key point 1...",
+        "Exhaustive, high-yield key point 2...",
+        "Exhaustive, high-yield key point 3..."
+      ]
+    }}
+  ],
   "key_concepts": [
-    {{"term": "Term Name", "definition": "Clear concise definition"}}
+    {{"term": "Term Name", "definition": "Clear, precise bullet definition", "key_takeaway": "Why it matters in exams"}}
   ],
   "formulas_and_rules": [
-    "Formula or rule with explanation"
+    "Formula, equation, or law with parameter definitions"
   ],
   "bullet_takeaways": [
-    "Core revision takeaway point"
+    "High-yield must-know point for exam revision"
   ],
   "mcq_questions": [
     {{
@@ -266,8 +286,8 @@ Return valid JSON strictly matching this schema:
     {{
       "id": 1,
       "question": "Conceptual question?",
-      "ideal_answer": "Complete model answer for revision.",
-      "key_point": "Key phrase required to score full marks"
+      "ideal_answer": "Complete model answer in points.",
+      "key_point": "Key mark-scoring keyword or principle"
     }}
   ]
 }}
@@ -285,91 +305,127 @@ Return valid JSON strictly matching this schema:
         except Exception as e:
             logger.warning(f"Gemini API call failed, falling back to algorithmic analyzer: {e}")
 
-    # Algorithmic fallback analyzer
+    # Comprehensive Algorithmic Fallback Analyzer
     lines = [line.strip() for line in clean_text.split("\n") if line.strip()]
     sentences = [s.strip() for s in clean_text.replace("\n", " ").split(".") if len(s.strip()) > 15]
 
-    summary_text = " ".join(sentences[:3]) if sentences else clean_text[:250] + "..."
+    # Summary in crisp points
+    summary_points = [
+        f"{s}." for s in sentences[:5]
+    ] if sentences else [f"Comprehensive review of {clean_title}."]
 
-    # Extract potential bullet points and concepts
+    # Extract all concepts and definitions from colons or bullet patterns
     concepts = []
+    formulas = []
     for line in lines:
-        if ":" in line and len(line) < 140:
-            parts = line.split(":", 1)
-            term = parts[0].replace("-", "").replace("*", "").strip()
-            definition = parts[1].strip()
-            if term and definition:
-                concepts.append({"term": term, "definition": definition})
-        if len(concepts) >= 4:
-            break
+        cleaned_line = line.replace("-", "").replace("*", "").replace("•", "").strip()
+        if ":" in cleaned_line and len(cleaned_line) < 200:
+            parts = cleaned_line.split(":", 1)
+            term = parts[0].strip()
+            def_text = parts[1].strip()
+            if len(term) < 40 and len(def_text) > 8:
+                concepts.append({"term": term, "definition": def_text, "key_takeaway": f"Core definition for {term}."})
+        elif any(char in line for char in ["=", "➔", "->", "+", "λ", "Ω", "Δ", "×"]):
+            if len(line) < 180 and not line.startswith("http"):
+                formulas.append(line)
 
     if not concepts:
         concepts = [
-            {"term": "Core Principle", "definition": sentences[0] if sentences else "Primary conceptual foundation."},
-            {"term": "Key Application", "definition": sentences[1] if len(sentences) > 1 else "Real-world physical or biological behavior."},
+            {"term": "Core Scientific Principle", "definition": sentences[0] if sentences else "Primary conceptual foundation.", "key_takeaway": "Fundamental exam definition."},
+            {"term": "Working Mechanism", "definition": sentences[1] if len(sentences) > 1 else "Governing operational process.", "key_takeaway": "Process and causal relationship."},
+            {"term": "Key Property / Factor", "definition": sentences[2] if len(sentences) > 2 else "Measurable physical/biological trait.", "key_takeaway": "Standard classification criteria."}
         ]
 
-    takeaways = []
-    for s in sentences[1:6]:
-        takeaways.append(s + ".")
-    if not takeaways:
-        takeaways = [
-            "Review the key definitions and formulas presented in this lesson.",
-            "Practice recalling the core concepts before attempting the assessment questions.",
-            "Consult the AI Tutor for clarification on challenging topics.",
+    if not formulas:
+        formulas = [
+            "Ensure all standard SI units and dimensional parameters are verified during calculations.",
+            "Consistently apply fundamental conservation laws (Mass, Energy, Momentum, Charge) across boundary conditions.",
         ]
 
-    # Generate sample MCQs from the text
+    # Group comprehensive key points by section/topic covering all content
+    categorized_points = []
+    
+    # Split by headings (#, ##, or capitalized titles) or chunk sentences
+    section_title = "Fundamental Core Concepts"
+    current_points = []
+    
+    for line in lines:
+        if line.startswith("#") or (line.isupper() and len(line) < 50):
+            if current_points:
+                categorized_points.append({"category": section_title, "points": current_points[:8]})
+                current_points = []
+            section_title = line.replace("#", "").strip()
+        elif len(line) > 20:
+            clean_p = line.replace("-", "").replace("*", "").replace("•", "").strip()
+            if clean_p and clean_p not in current_points:
+                current_points.append(clean_p)
+
+    if current_points:
+        categorized_points.append({"category": section_title, "points": current_points[:8]})
+
+    if not categorized_points:
+        categorized_points = [
+            {
+                "category": f"Key Principles of {clean_title}",
+                "points": [f"{s}." for s in sentences[:8]],
+            }
+        ]
+
+    takeaways = [
+        f"Master the core definition: {concepts[0]['term']} is defined as {concepts[0]['definition']}.",
+        f"Remember the primary governing rule: {formulas[0]}.",
+        f"Examine how {clean_title} operates under varying physical/environmental parameters.",
+        "Practice drawing labeled diagrams and schematics for descriptive examination sections.",
+        "Test yourself with the auto-generated assessment quiz questions below."
+    ]
+
     mcqs = []
     for idx, c in enumerate(concepts[:3]):
         mcqs.append({
             "id": idx + 1,
-            "question": f"Which of the following correctly defines '{c['term']}' according to the lesson?",
+            "question": f"According to the lesson, which statement accurately defines '{c['term']}'?",
             "options": [
                 c["definition"],
-                f"An unrelated property that opposes {c['term'].lower()}.",
-                f"A secondary factor that only applies at absolute zero temperature.",
-                "None of the above statements are supported by the lesson.",
+                f"An extraneous secondary effect that opposes {c['term'].lower()}.",
+                f"A property that only occurs at extreme non-standard temperatures.",
+                "None of the above statements represent the correct definition.",
             ],
             "correct_answer": c["definition"],
             "explanation": f"As highlighted in the study material: {c['term']} is defined as {c['definition']}.",
         })
 
-    # Add a general comprehension question
     mcqs.append({
         "id": len(mcqs) + 1,
-        "question": f"What is the primary scientific focus of '{clean_title}'?",
+        "question": f"What is the central focus of the lesson '{clean_title}'?",
         "options": [
-            summary_text[:80] + "...",
+            summary_points[0] if summary_points else "Foundational study material.",
             "Historical origins of unrelated mechanical devices.",
-            "Hypothetical situations with no practical significance.",
-            "Only theoretical mathematics without empirical observation.",
+            "Purely fictional hypotheses with no scientific relevance.",
+            "Non-standard conjectures unsupported by experimental evidence.",
         ],
-        "correct_answer": summary_text[:80] + "...",
-        "explanation": "This represents the central executive theme of the uploaded study document.",
+        "correct_answer": summary_points[0] if summary_points else "Foundational study material.",
+        "explanation": "This represents the primary thesis and conceptual foundation of the uploaded text.",
     })
 
     return {
         "title": clean_title,
-        "summary": summary_text,
+        "summary_points": summary_points,
+        "comprehensive_key_points": categorized_points,
         "key_concepts": concepts,
-        "formulas_and_rules": [
-            "Pay close attention to standard SI units and dimensional quantities.",
-            "Verify all conservation laws and boundary conditions stated in the text.",
-        ],
+        "formulas_and_rules": formulas,
         "bullet_takeaways": takeaways,
         "mcq_questions": mcqs,
         "short_answer_questions": [
             {
                 "id": 1,
-                "question": f"Explain the main significance of {clean_title} in physical or natural systems.",
-                "ideal_answer": summary_text,
+                "question": f"State the primary significance of {clean_title} in physical or natural systems.",
+                "ideal_answer": " • " + "\n • ".join(summary_points[:3]),
                 "key_point": "State the fundamental concept and explain how it governs the observed phenomenon.",
             },
             {
                 "id": 2,
                 "question": "What key takeaway from this lesson can be observed in everyday rural life or agriculture?",
-                "ideal_answer": "The concepts demonstrate how foundational scientific rules apply to local energy, botanical growth, or physical mechanics.",
+                "ideal_answer": " • Scientific principles apply directly to local energy, botanical growth, or physical mechanics.\n • Observation and measurement verify theoretical models in everyday environments.",
                 "key_point": "Connect the theoretical law to tangible real-world physical observations.",
             },
         ],

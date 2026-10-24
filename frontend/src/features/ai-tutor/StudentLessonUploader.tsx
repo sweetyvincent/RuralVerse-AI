@@ -82,6 +82,7 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
 
   // Question chat question input
   const [directQuestion, setDirectQuestion] = useState<string>('');
+  const [notesFilter, setNotesFilter] = useState<string>('');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,21 +162,44 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
 
   const handleDownloadRevisionSheet = () => {
     if (!analysis) return;
-    let md = `# ${analysis.title} — Key Revision Sheet\n\n`;
-    md += `## Executive Summary\n${analysis.summary}\n\n`;
-    md += `## Key Definitions & Concepts\n`;
+    let md = `# ${analysis.title} — Key Revision Points Sheet\n\n`;
+
+    md += `## 📌 Executive Summary (Key Points)\n`;
+    const summaryList =
+      analysis.summary_points && analysis.summary_points.length > 0
+        ? analysis.summary_points
+        : analysis.summary
+        ? analysis.summary.split('. ').map((s) => s.trim()).filter(Boolean)
+        : [];
+    summaryList.forEach((pt) => {
+      md += `- ${pt.endsWith('.') ? pt : pt + '.'}\n`;
+    });
+    md += `\n`;
+
+    if (analysis.comprehensive_key_points && analysis.comprehensive_key_points.length > 0) {
+      md += `## 📚 Comprehensive Section-by-Section Key Notes (All Topics Covered)\n\n`;
+      analysis.comprehensive_key_points.forEach((cat) => {
+        md += `### ${cat.category}\n`;
+        cat.points.forEach((pt) => {
+          md += `- ${pt}\n`;
+        });
+        md += `\n`;
+      });
+    }
+
+    md += `## 💡 Key Definitions & Scientific Nomenclature\n`;
     analysis.key_concepts.forEach((c) => {
       md += `- **${c.term}:** ${c.definition}\n`;
     });
-    md += `\n## Core Formulas & Rules\n`;
+    md += `\n## ⚡ Core Formulas, Equations & Laws\n`;
     analysis.formulas_and_rules.forEach((f) => {
       md += `- ${f}\n`;
     });
-    md += `\n## 5 Quick Revision Takeaways\n`;
+    md += `\n## 🎯 High-Yield Exam Takeaways\n`;
     analysis.bullet_takeaways.forEach((t) => {
       md += `- ${t}\n`;
     });
-    md += `\n## Assessment Quiz Questions\n`;
+    md += `\n## 📝 Assessment Quiz Questions\n`;
     analysis.mcq_questions.forEach((q, i) => {
       md += `\n### Q${i + 1}: ${q.question}\n`;
       q.options.forEach((opt) => (md += `- ${opt}\n`));
@@ -186,7 +210,7 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${analysis.title.replace(/\s+/g, '_')}_Revision_Notes.md`;
+    link.download = `${analysis.title.replace(/\s+/g, '_')}_Key_Revision_Notes.md`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -376,76 +400,172 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
 
           {/* TAB 1: KEY REVISION NOTES */}
           {activeTab === 'notes' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Summary & Concepts */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Executive Summary */}
-                <Card className="p-6 bg-slate-900/90 border-slate-800 space-y-3">
-                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-                    <BookOpen className="w-4 h-4" />
-                    <span>Executive Summary & Overview</span>
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed font-sans">{analysis.summary}</p>
-                </Card>
-
-                {/* Key Concepts and Definitions */}
-                <Card className="p-6 bg-slate-900/90 border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-purple-400" /> Key Concepts & Scientific Definitions
-                    </h3>
-                    <Badge variant="purple">{analysis.key_concepts.length} Terms Identified</Badge>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {analysis.key_concepts.map((concept, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800/80 space-y-1.5"
-                      >
-                        <span className="font-bold text-cyan-300 text-xs block">{concept.term}</span>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">{concept.definition}</p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+            <div className="space-y-6">
+              {/* Search & Stats Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-900/90 border border-slate-800 rounded-2xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="cyan" className="font-mono text-xs">
+                    {(analysis.comprehensive_key_points?.reduce((acc, c) => acc + c.points.length, 0) || 0) +
+                      (analysis.summary_points?.length || 0)}{' '}
+                    Key Points Extracted
+                  </Badge>
+                  <span className="text-xs text-slate-400">
+                    All major content from the document organized into high-yield revision bullet points
+                  </span>
+                </div>
+                <div className="w-full sm:w-72">
+                  <input
+                    type="text"
+                    value={notesFilter}
+                    onChange={(e) => setNotesFilter(e.target.value)}
+                    placeholder="Search key points or concepts..."
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                  />
+                </div>
               </div>
 
-              {/* Right Column: Formulas & Bullet Takeaways */}
-              <div className="space-y-6">
-                {/* Formulas & Governing Rules */}
-                <Card className="p-5 bg-slate-900/90 border-slate-800 space-y-3">
-                  <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" /> Important Formulas & Laws
-                  </h3>
-                  <div className="space-y-2">
-                    {analysis.formulas_and_rules.map((rule, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 font-mono"
-                      >
-                        {rule}
+              {/* Main Grid: Left 2 Cols (Key Points & Sections) + Right 1 Col (Formulas, Concepts, Takeaways) */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Executive Summary Points & Section-by-Section Points */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Executive Key Points */}
+                  <Card className="p-6 bg-slate-900/90 border-slate-800 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                      <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                        <BookOpen className="w-4 h-4" />
+                        <span>Executive Summary (Key Points)</span>
                       </div>
-                    ))}
-                  </div>
-                </Card>
+                      <Badge variant="cyan">High-Yield Core</Badge>
+                    </div>
+                    <ul className="space-y-2.5">
+                      {(analysis.summary_points && analysis.summary_points.length > 0
+                        ? analysis.summary_points
+                        : analysis.summary
+                        ? analysis.summary.split('. ').map((s) => s.trim()).filter(Boolean)
+                        : []
+                      )
+                        .filter((p) => !notesFilter || p.toLowerCase().includes(notesFilter.toLowerCase()))
+                        .map((point, idx) => (
+                          <li
+                            key={idx}
+                            className="flex items-start gap-3 text-xs text-slate-200 leading-relaxed font-sans"
+                          >
+                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-mono text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                              {idx + 1}
+                            </span>
+                            <span>{point.endsWith('.') ? point : `${point}.`}</span>
+                          </li>
+                        ))}
+                    </ul>
+                  </Card>
 
-                {/* 5 Quick Exam Revision Takeaways */}
-                <Card className="p-5 bg-slate-900/90 border-slate-800 space-y-3">
-                  <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle className="w-3.5 h-3.5" /> 5 Key Exam Takeaways
-                  </h3>
-                  <ul className="space-y-2.5">
-                    {analysis.bullet_takeaways.map((point, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed">
-                        <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                          {idx + 1}
-                        </span>
-                        <span>{point}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
+                  {/* Comprehensive Section-by-Section Key Points (All Content Covered) */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-purple-400" /> Comprehensive Notes (All Topics Covered from Document)
+                      </h3>
+                      <span className="text-[11px] text-slate-400">
+                        {analysis.comprehensive_key_points?.length || 0} Categories
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {analysis.comprehensive_key_points?.map((section, catIdx) => {
+                        const filteredPoints = section.points.filter(
+                          (p) => !notesFilter || p.toLowerCase().includes(notesFilter.toLowerCase())
+                        );
+                        if (notesFilter && filteredPoints.length === 0) return null;
+
+                        return (
+                          <Card key={catIdx} className="p-5 bg-slate-900/90 border-slate-800 space-y-3 shadow-lg">
+                            <div className="flex items-center justify-between border-b border-slate-800/70 pb-2.5">
+                              <h4 className="text-xs font-bold text-cyan-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                                {section.category}
+                              </h4>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                {filteredPoints.length} points
+                              </span>
+                            </div>
+                            <ul className="space-y-2">
+                              {filteredPoints.map((pt, pIdx) => (
+                                <li
+                                  key={pIdx}
+                                  className="flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed pl-1"
+                                >
+                                  <span className="text-cyan-400 font-black text-sm shrink-0 leading-none mt-0.5">
+                                    •
+                                  </span>
+                                  <span>{pt}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Formulas, Concepts & Exam Takeaways */}
+                <div className="space-y-6">
+                  {/* Formulas & Governing Rules */}
+                  <Card className="p-5 bg-slate-900/90 border-slate-800 space-y-3 shadow-lg">
+                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" /> Important Formulas & Laws
+                    </h3>
+                    <div className="space-y-2">
+                      {analysis.formulas_and_rules.map((rule, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 font-mono"
+                        >
+                          {rule}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  {/* Key Concepts and Definitions */}
+                  <Card className="p-5 bg-slate-900/90 border-slate-800 space-y-3 shadow-lg">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-purple-400" /> Key Concepts & Terms
+                      </h3>
+                      <Badge variant="purple">{analysis.key_concepts.length}</Badge>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {analysis.key_concepts.map((concept, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 space-y-1"
+                        >
+                          <span className="font-bold text-cyan-300 text-xs block">{concept.term}</span>
+                          <p className="text-[11px] text-slate-400 leading-relaxed">{concept.definition}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  {/* Quick Exam Revision Takeaways */}
+                  <Card className="p-5 bg-slate-900/90 border-slate-800 space-y-3 shadow-lg">
+                    <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" /> High-Yield Exam Takeaways
+                    </h3>
+                    <ul className="space-y-2.5">
+                      {analysis.bullet_takeaways.map((point, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed">
+                          <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                </div>
               </div>
             </div>
           )}
