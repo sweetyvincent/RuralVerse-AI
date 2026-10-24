@@ -1,5 +1,6 @@
 import api from './api';
 import { DocumentItem } from '../types';
+import { extractTextFromPdf } from '../lib/pdfExtractor';
 
 export interface LessonAnalysisResult {
   title: string;
@@ -60,6 +61,10 @@ export const aiService = {
 
   async uploadStudentLesson(file: File): Promise<{ title: string; filename: string; content: string }> {
     const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+    const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    // 1. Try backend extraction first if not on static preview
     if (!isGitHubPages) {
       try {
         const formData = new FormData();
@@ -67,27 +72,37 @@ export const aiService = {
         const res = await api.post('/ai/student/upload-lesson', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        return res.data;
+        if (res.data && res.data.content && !res.data.content.startsWith('%PDF-')) {
+          return res.data;
+        }
       } catch (err) {
-        console.warn('Server upload error, reading file locally in browser:', err);
+        console.warn('Server upload error, falling back to browser extractor:', err);
       }
     }
 
-    // Browser client-side file reading fallback (works everywhere, including GitHub Pages)
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-      reader.onload = (e) => {
-        const content = (e.target?.result as string) || '';
-        resolve({
-          title,
-          filename: file.name,
-          content,
-        });
+    // 2. If it is a PDF file, extract clean text using PDF.js
+    if (ext === 'pdf') {
+      const extractedText = await extractTextFromPdf(file);
+      return {
+        title,
+        filename: file.name,
+        content: extractedText,
       };
-      reader.onerror = () => reject(new Error('Failed to read file in browser.'));
-      reader.readAsText(file);
-    });
+    }
+
+    // 3. For plain text files (.txt, .md, etc.)
+    const textContent = await file.text();
+    if (textContent.startsWith('%PDF-') || textContent.includes('/FlateDecode')) {
+      throw new Error(
+        'Raw binary PDF data detected. Please ensure the file contains readable text or copy and paste the lesson notes directly.'
+      );
+    }
+
+    return {
+      title,
+      filename: file.name,
+      content: textContent,
+    };
   },
 
   async analyzeLesson(data: { title: string; content: string; language?: string }): Promise<LessonAnalysisResult> {

@@ -71,6 +71,8 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
   const [lessonText, setLessonText] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<LessonAnalysisResult | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'quiz' | 'ask_ai'>('notes');
 
@@ -85,35 +87,54 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
     const file = e.target.files?.[0];
     if (!file) return;
     setSelectedFile(file);
+    setErrorMessage(null);
 
     try {
       setIsProcessing(true);
+      setProcessingStatus(file.name.toLowerCase().endsWith('.pdf') ? 'Extracting text from PDF document...' : 'Reading file content...');
       const res = await aiService.uploadStudentLesson(file);
+      
+      if (res.content.startsWith('%PDF-') || res.content.includes('/FlateDecode')) {
+        throw new Error('This PDF contains compressed binary streams without a readable text layer. Please copy-paste the text directly into the box.');
+      }
+
       setLessonTitle(res.title);
       setLessonText(res.content);
-    } catch (err) {
-      alert('Failed to parse file. Please copy-paste the text content directly.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to read PDF text. Please copy and paste the lesson text directly.');
     } finally {
       setIsProcessing(false);
+      setProcessingStatus('');
     }
   };
 
   const handleGenerateNotes = async () => {
-    if (!lessonText.trim()) return;
+    const trimmed = lessonText.trim();
+    if (!trimmed) return;
+    setErrorMessage(null);
+
+    // Guard against binary PDF streams
+    if (trimmed.startsWith('%PDF-') || trimmed.includes('/FlateDecode') || trimmed.includes('endobj')) {
+      setErrorMessage('Raw binary PDF data detected. Please erase and copy-paste the actual readable text of your lesson.');
+      return;
+    }
+
     setIsProcessing(true);
+    setProcessingStatus('Analyzing lesson and generating revision notes & quiz...');
     try {
       const result = await aiService.analyzeLesson({
         title: lessonTitle.trim() || 'My Lesson',
-        content: lessonText.trim(),
+        content: trimmed,
       });
       setAnalysis(result);
       setActiveTab('notes');
       setSelectedAnswers({});
       setRevealedShortAnswers({});
     } catch (err: any) {
-      alert(err.message || 'Failed to analyze lesson.');
+      setErrorMessage(err.message || 'Failed to analyze lesson.');
     } finally {
       setIsProcessing(false);
+      setProcessingStatus('');
     }
   };
 
@@ -121,6 +142,7 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
     setLessonTitle(sample.title);
     setLessonText(sample.content);
     setSelectedFile(null);
+    setErrorMessage(null);
   };
 
   const handleSelectOption = (questionId: number, option: string) => {
@@ -208,6 +230,23 @@ export const StudentLessonUploader: React.FC<Props> = ({ onStartChatWithContext 
             ))}
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2.5">
+            <X className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold block">Document Processing Notice:</span>
+              <span>{errorMessage}</span>
+            </div>
+          </div>
+        )}
+
+        {processingStatus && (
+          <div className="p-3.5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-xs text-cyan-300 flex items-center gap-2.5 animate-pulse">
+            <Sparkles className="w-4 h-4 shrink-0 text-cyan-400" />
+            <span>{processingStatus}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* File drag/drop upload box */}
